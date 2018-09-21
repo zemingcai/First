@@ -308,3 +308,6 @@ public class WebSocket {
 
 </body>
 </html>
+
+
+restTemplate做前台服务转发          https://blog.csdn.net/yiifaa/article/details/77939282
