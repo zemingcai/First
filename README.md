@@ -16,7 +16,7 @@ restTemplate做前台服务转发          https://blog.csdn.net/yiifaa/article/
     public ResponseData createProduct(@RequestBody ProductVo product) {
     	logger.info("创建产品");
     	String url = this.productServicePath;
-    HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);
+    	HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);
     	JSONObject jso=JSONObject.fromObject(product);
     	HttpEntity<String> entity = new HttpEntity<String>(jso.toString(),headers);
     	ResponseEntity<Result> result = restTemplate.exchange(url, HttpMethod.POST, entity, Result.class,product);
@@ -52,9 +52,7 @@ restTemplate做前台服务转发          https://blog.csdn.net/yiifaa/article/
      */
     @GetMapping("/rules/deleteRabbitMQ/{tenantId}/{ruleId}")
 	public ResponseData deleteRabbitMQ(@PathVariable String tenantId,@PathVariable String ruleId,@RequestParam String id) {
-    	logger.info("开始删除规则mysql");
-        
-        
+    	logger.info("开始删除规则mysql")
     	String url = this.ruleServicePath+ "/deleteRabbitMQ/"+tenantId+"/"+ruleId +"?id={id}";
     	Map<String, Object> uriVariables = new HashMap<String, Object>(5);
         uriVariables.put("id", id);
