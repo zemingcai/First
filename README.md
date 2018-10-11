@@ -1,183 +1,164 @@
-# First
-第一个仓库
-小伙子，你那什么车啊？跳一下？
-好啊，哎哟 不错哦
+前言：本项目基于maven构建
+
+spring-boot项目可以快速构建web应用，其内置的tomcat容器也十分方便我们的测试运行；
 
 
+spring-boot项目需要部署在外部容器中的时候，spring-boot导出的war包无法再外部容器（tomcat）中运行或运行报错，本章就是详细讲解如何解决这个问题
+1、pom.xml一览
 
-restTemplate做前台服务转发          https://blog.csdn.net/yiifaa/article/details/77939282
- /**
-     * 创建产品
-     * @param product
-     * @return
-     */
-    @PostMapping("/add")
-    @ResponseBody
-    public ResponseData createProduct(@RequestBody ProductVo product) {
-    	logger.info("创建产品");
-    	String url = this.productServicePath;
-    	HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);
-    	JSONObject jso=JSONObject.fromObject(product);
-    	HttpEntity<String> entity = new HttpEntity<String>(jso.toString(),headers);
-    	ResponseEntity<Result> result = restTemplate.exchange(url, HttpMethod.POST, entity, Result.class,product);
-    	Result res =result.getBody();
-    	ResponseData rd=ResponseData.buildNormalResponse2(res.getCode(), res.getData());
-    	System.out.println("===============CreateProduct===================="+rd.getData());  
-        return rd;
+    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    	<modelVersion>4.0.0</modelVersion>
+    	<groupId>项目名称自行自行定义</groupId>
+    	<artifactId>项目名称自行定义</artifactId>
+    	<version>1.1.2-SNAPSHOT</version>
+    	<packaging>war</packaging>
+    	<parent>
+    		<groupId>org.springframework.boot</groupId>
+    		<artifactId>spring-boot-starter-parent</artifactId>
+    		<version>1.4.0.RELEASE</version>
+    	</parent>
+    	<dependencies>
+    		<!-- spring-boot web -->
+    		<dependency>
+    			<groupId>org.springframework.boot</groupId>
+    			<artifactId>spring-boot-starter-web</artifactId>
+    			<!-- 排除内置容器，排除内置容器导出成war包可以让外部容器运行spring-boot项目-->
+    			<exclusions>
+    				<exclusion>
+    					<groupId>org.springframework.boot</groupId>
+    					<artifactId>spring-boot-starter-tomcat</artifactId>
+    				</exclusion>
+    			</exclusions>
+    			 
+    		</dependency>
+    		<dependency>
+    			<groupId>javax.servlet</groupId>
+    			<artifactId>javax.servlet-api</artifactId>
+    		</dependency>
+    		<!-- https://mvnrepository.com/artifact/redis.clients/jedis -->
+    		<dependency>
+    			<groupId>redis.clients</groupId>
+    			<artifactId>jedis</artifactId>
+    		</dependency>
+     
+    		<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-pool2 -->
+    		<dependency>
+    			<groupId>org.apache.commons</groupId>
+    			<artifactId>commons-pool2</artifactId>
+    		</dependency>
+     
+    		<dependency>
+    			<groupId>org.json</groupId>
+    			<artifactId>json</artifactId>
+    		</dependency>
+     
+    		<dependency>
+    			<groupId>org.springframework.boot</groupId>
+    			<artifactId>spring-boot-starter-test</artifactId>
+    			<scope>test</scope>
+    		</dependency>
+    		<dependency>
+    			<groupId>com.jayway.jsonpath</groupId>
+    			<artifactId>json-path</artifactId>
+    			<scope>test</scope>
+    		</dependency>
+    	</dependencies>
+    	
+    	<!-- Package as an executable jar -->
+    	<build>
+    		<plugins>
+    			<plugin>
+    				<groupId>org.springframework.boot</groupId>
+    				<artifactId>spring-boot-maven-plugin</artifactId>
+    			</plugin>
+    		</plugins>
+    	</build>
+    	<repositories>
+    		<repository>
+    			<id>spring-releases</id>
+    			<url>https://repo.spring.io/libs-release</url>
+    		</repository>
+    	</repositories>
+    	<pluginRepositories>
+    		<pluginRepository>
+    			<id>spring-releases</id>
+    			<url>https://repo.spring.io/libs-release</url>
+    		</pluginRepository>
+    	</pluginRepositories>
+    </project>
+
+
+2、排除org.springframework.boot依赖中的tomcat内置容器
+
+注意：只有排除内置容器，才能让外部容器运行spring-boot项目
+
+org.springframework.boot依赖中的排除项，测试时不要排除内置容器，会导致springboot无法测试运行，导出war包时再加上该项即可
+
+<!-- spring-boot web -->
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+<!-- 排除内置容器，排除内置容器导出成war包可以让外部容器运行spring-boot项目-->
+<exclusions>
+<exclusion>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-tomcat</artifactId>
+</exclusion>
+</exclusions>
+</dependency>
+3、实现SpringBootServletInitializer接口
+
+spring-boot入口类必须实现SpringBootServletInitializer接口的configure方法才能让外部容器运行spring-boot项目
+
+注意：SpringBootServletInitializer接口需要依赖 javax.servlet
+
+    package cn.eguid.Run;
+     
+    import org.springframework.boot.SpringApplication;
+    import org.springframework.boot.autoconfigure.SpringBootApplication;
+    import org.springframework.boot.builder.SpringApplicationBuilder;
+    import org.springframework.boot.web.support.SpringBootServletInitializer;
+    import org.springframework.context.annotation.ComponentScan;
+     
+    import cc.eguid.livepush.PushManager;
+    import cc.eguid.livepush.PushManagerImpl;
+    import cn.eguid.livePushServer.redisManager.RedisMQHandler;
+     
+    @SpringBootApplication
+    // 开启通用注解扫描
+    @ComponentScan
+    public class Application extends SpringBootServletInitializer {
+    	/**
+    	 * 实现SpringBootServletInitializer可以让spring-boot项目在web容器中运行
+    	 */
+    	@Override
+    	protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
+    		builder.sources(this.getClass());
+    		return super.configure(builder);
+    	}
+    	
+    	public static void main(String[] args) {
+    		SpringApplication.run(Application.class, args);
+    		
+    	}
     }
-  
-  
-  /**
-     * 根据GRN删除产品
-     * @param productGrn
-     * @return
-     */
-    @GetMapping("/del/{id}")
-    @ResponseBody
-    public ResponseData deletePorduct(@PathVariable(name= "id") String id) {
-    	logger.info("开始删除设备");
-        String url = this.productServicePath+ "/"+id;
-    	HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);
-    	ResponseEntity<Result> result = restTemplate.exchange(url, HttpMethod.DELETE, null, Result.class);
-    	Result res =result.getBody();
-    	ResponseData rd=ResponseData.buildNormalResponse2(res.getCode(), res.getData());
-    	System.out.println("===============deleteThing===================="+rd.getData());  
-        return rd;
-    }
-  
-  /**
-     * 删除规则ribbitMQ
-     * @param ruleId
-     * @return
-     */
-    @GetMapping("/rules/deleteRabbitMQ/{tenantId}/{ruleId}")
-	public ResponseData deleteRabbitMQ(@PathVariable String tenantId,@PathVariable String ruleId,@RequestParam String id) {
-    	logger.info("开始删除规则mysql")
-    	String url = this.ruleServicePath+ "/deleteRabbitMQ/"+tenantId+"/"+ruleId +"?id={id}";
-    	Map<String, Object> uriVariables = new HashMap<String, Object>(5);
-        uriVariables.put("id", id);
-    	HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON);
-    	ResponseEntity<Result> result = restTemplate.exchange(url, HttpMethod.DELETE, null, Result.class,uriVariables);
-    	Result res =result.getBody();
-    	ResponseData rd=ResponseData.buildNormalResponse(res.getCode(), res.getData());
-    	System.out.println("===============deleteRuleRabbitMQ===================="+rd.getData());  
-        return rd;
-	}
-	
-	
-	
-	
-	
-	package com.movitech.contract.config;
- 
-import java.lang.annotation.*;
- 
-@Target({ ElementType.METHOD, ElementType.TYPE })
-@Retention(RetentionPolicy.RUNTIME)
-@Documented
-public @interface Oauth {
- 
-}
 
 
+--------------------- 
+作者：做好自己--eguid 
+来源：CSDN 
+原文：https://blog.csdn.net/eguid_1/article/details/52609600?utm_source=copy 
+版权声明：本文为博主原创文章，转载请附上博文链接！
+总结：
 
+外部容器运行spring-boot项目，只需要在原项目上做两件事
+1、在pom.xml中排除org.springframework.boot的内置tomcat容器
 
-package com.movitech.contract.config;
- 
-import com.movitech.commons.utils.StringUtil;
-import com.movitech.contract.dao.OauthDao;
-import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
- 
-import javax.servlet.http.HttpServletRequest;
- 
- 
-@Aspect //  声明切面
-@Component //声明组件
-@ComponentScan //组件自动扫描
-@EnableAspectJAutoProxy //spring自动切换JDK动态代理和CGLIB
-public class OauthAspect {
-    @Autowired
-    private OauthDao oauthDao;
-    @Before("execution(public * com.movitech.contract.controller.*.*(..)) && @annotation(com.movitech.contract.config.Oauth)")
-    public void doOauth(JoinPoint point) throws Throwable {
-        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
-        //获取调用者带来的token
-        Object token = request.getHeaders("token").nextElement();
-        //截取请求的uri
-        String requestUri = request.getRequestURI();
-        int num = requestUri.length() - requestUri.replace("/","").length();
-        if(num >= 4){
-            //截取/a/b/c三层后面的字符
-            requestUri = getStr(requestUri,3);
-        }
-        System.out.println("token:"+token+"======="+"requestUri:"+requestUri);
-        //根据uri来获取接口开发状态
-        Integer isValid = oauthDao.getIsValid(requestUri);
-        if(StringUtil.isEmpty(isValid)){
-            System.out.println("接口状态：关闭！");
-            throw new Exception("接口状态：关闭，不允许访问！");
-        }else {
-            if(isValid == 1){
-                System.out.println("接口状态：可用！");
-            }else{
-                System.out.println("接口状态：关闭！");
-                throw new Exception("接口状态：关闭，不允许访问！");
-            }
-        }
- 
-        //根据uri来获取鉴权约定的token
-        String id = oauthDao.getId(requestUri);
-        //判断是否一致，是：放行；否则抛出异常
-        if(token.equals(id)){
-            System.out.println("权限通过，放行");
-        }else {
-            throw new Exception("权限不满足,不允许访问次接口！请先去鉴权！！");
-        }
-    }
-    private static String getStr(String str, int n) {
-        int i = 0;
-        int s = 0;
-        while (i++ < n) {
-            s = str.indexOf("/", s + 1);
-            if (s == -1) {
-                return str;
-            }
-        }
-        return str.substring(0, s);
-    }
-}
- 
- 
- 
- 
- 
- 
- package com.movitech.contract.controller;
- 
-import com.movitech.contract.config.Oauth;
-import com.movitech.contract.service.HelloService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
- 
-@RestController
-public class HelloController {
-    @Autowired
-    private HelloService helloService;
- 
-    @GetMapping("/a/b/c/d/e/f")
-    @Oauth
-    public String hello(String name) {
-        String result = "nihao3";
-        return result;
-    }
-}
-
+2、spring-boot入口实现SpringBootServletInitializer接口
+补充：SpringBootServletInitializer接口依赖javax.servlet包，需要在pom.xml中引入该包
+--------------------- 
+作者：做好自己--eguid 
+来源：CSDN 
+原文：https://blog.csdn.net/eguid_1/article/details/52609600?utm_source=copy 
+版权声明：本文为博主原创文章，转载请附上博文链接！
